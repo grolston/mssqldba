@@ -7,7 +7,7 @@ Example:
 create a credential object to store either windows credential or SQL Account 
 $Creds = Get-Credential
 
-# note if you are using Windows account which you are running powershell under, you will not need to supply a credential.
+note: if you are using Windows account which you are running powershell under, you will not need to supply a credential.
 
 instantiate the object supplying your SQL connection information
 $Local = New-SqlServerClient -ServerInstance myComp -Database myDatabase  -Credential $Creds -Security SQLAccount -Port 1433

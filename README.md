@@ -18,21 +18,21 @@ $Local = New-SqlServerClient -ServerInstance myComp -Database myDatabase  -Crede
 
 ```
 
-list all database
+List all database
 ```Powershell
 $Local.ListDatabases()
 ```
 
-find orphaned users
+Find orphaned users
 ```Powershell
 $Local.GetDatabaseOrphanedUsers()
 ```
-view current database connected to
+View current database connected to
 ```Powershell
 $Local.Database()
 ```
 change database connection
 ```Powershell
 $Local.Database('MyNewDatabase')
-```Powershell
+```
  

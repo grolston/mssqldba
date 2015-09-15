@@ -167,32 +167,42 @@ function Get-SqlExecutionPlan
 function New-SqlServerClient 
 {
 <#
-    Class Supports:
-        Execute
-        ListDatabases
-        ListDatbaseOwners
-        GetServerVersion
-        GetWindowsOSInfo
-        GetServiceInfo
-        GetHostHardwareInfo
-        GetSystemManufacturerAndModel
-        GetSQLCongfigs
-        GetDatabaseFileInfo
-        GetSQLLUNInfo
-        GetErrorLogConfig
-        GetConnectedClientsIP
-        GetTcpInfo
-        GetAllDatabaseBackupHistory
-        SearchSQLErrorLog
-        GetDatabaseProperties
-        ListDatabaseOrphanedUsers
-        GetAgentAlertInfo
-        GetAgentJobInfo
+.Synopsis
+   PowerShell MS SQL DBA Tool based on OOP Design
+   allowing SQL connection and methods for quick
+   discovery and troubleshooting for DBAs.
+.DESCRIPTION
+   New-SQLServerClient creates an instance of the 
+   SQL Server Client toolkit. Use this advanced
+   function to create an object to connect into 
+   the target SQL Server and call SQLServerClient methods.
+.EXAMPLE
+   Create Connection to SQL Server using SQL Account with secure credential
+   $Creds = Get-Credential
+   $sqlClient = New-SqlServerClient -ServerInstance MyDatabaseServer -Database MyDataBase `
+    -Credential $Creds -Security SQLAccount -Port 1433
+.EXAMPLE
+   Create Connection to SQL Server using current Windows Credentials and default port
+   $sqlClient = New-SqlServerClient -ServerInstance MyDatabaseServer -Database MyDataBase
+.NOTES
+  Many of the queries were adapted from Glen Berry's SQLSKills.com queries.   
+  
+  Version History
+  0.0.1 - 9/12/2015 - Added New-SQLServerClient documentation
+  0.0.2 - 9/14/2015 - Added Help Function removed long description
+
+  TODO
+   - Complete documentation
+   - Add .Help() method calling Get-SqlServerClientHelp
+   - Test SQL Agent and Alerts
+   - Test Missing Index Query
+   - Test .SearchErrorLog
+
 
 #>
-
     [CmdletBinding(SupportsShouldProcess=$true, 
                   ConfirmImpact='Medium')]
+    [OutputType([pscustomobject])]
     PARAM
     (
         # Named instance of the SQP Server
@@ -229,7 +239,7 @@ function New-SqlServerClient
         [AllowNull()]
         [int]$Port
 
-    )#end param
+    )#end PARAM
 
     BEGIN
     {
@@ -470,7 +480,7 @@ function New-SqlServerClient
             PARAM()
             try
             {
-                [string]$Query = GetWindowsOSInfo
+                [string]$Query = Get-SQLGetWindowsOSInfo
                 $results = $this.Execute($Query)
             }
             catch
@@ -509,22 +519,7 @@ function New-SqlServerClient
             }
             # return the results
             $results
-        }<#end GetHostHardwareInfo #> 
-        
-        $SqlClient | Add-Member -MemberType ScriptMethod -Name GetSystemManufacturerAndModel -Value {
-            PARAM()
-            try
-            {
-                [string]$Query = Get-SQLGetSystemManufacturerAndModel
-                $results = $this.Execute($Query)
-            }
-            catch
-            {
-                write-error $_ -ErrorAction stop
-            }
-            # return the results
-            $results
-        }<#end GetSystemManufacturerAndModel #> 
+        }<#end GetHostHardwareInfo #>  
         
         $SqlClient | Add-Member -MemberType ScriptMethod -Name GetSQLCongfigs -Value {
             PARAM()
@@ -946,3 +941,295 @@ function New-SqlServerClient
 }#end New-SqlServerClient
 
 Export-ModuleMember -Function New-SqlServerClient
+
+function Get-SqlServerClientHelp
+{
+    PARAM()
+
+    $AllHelpMessage = @"
+    Sql Server Client Methods:
+        .Database()
+            Returns current database attribute for SQL connection
+
+        .Database("[NewDatabase]")
+            Change the current database connection property
+
+        .Execute('[Read-Only TSQL Statement...]')
+            User supplies any read-only t-sql query to execute
+
+        .GetAdHocQueries()
+            Get the cached AdHoc Queries
+            Properties: cacheobjtype
+                        objtype
+                        QueryText
+                        size_in_bytes
+
+        .GetAgentAlertInfo()
+            Get information about the SQL Server Agent
+            Alert History
+
+        .GetAgentJobInfo()
+            Retrieve information About SQL Agent
+            Job History
+
+        .GetAllDatabaseBackupHistory()
+            Get all backups the SQL instance is tracking.
+                The returned result can be large depending
+                on the history kept.
+            Properties: DatabaseName
+                        PhysicalDeviceName
+                        SizeMB
+                        BackupStartDate
+                        FirstLSN
+                        LastLSN
+                        BackupType
+                        ServerName
+                        RecoveryModel
+
+        .GetCachedQueryExecCnt()
+            Retrieves information about the Cached Queries
+                utilized by the SQL Engine.
+            Properties: execution_count
+                        last_elapsed_time
+                        last_rows
+                        max_elapsed_time
+                        max_rows
+                        min_elapsed_time
+                        min_rows
+                        query_text
+                        total_logical_reads
+                        total_rows
+                        total_worker_time
+
+        .GetConnectedClientsIP()
+            Get list of current connected client IPs to the 
+                SQL instance
+            Properties: ClientIPAddress
+                        IPAddressOfSQLServer
+                        ServerName
+
+        .GetConnectedLoginCount()
+            Returns the login name, program name, and
+                session count for the current connections
+            Properties: login_name
+                        program_name
+                        session_count
+
+        .GetDatabases()
+            Retrieves all databases on the instance
+                Returns System.Data.DataRow
+            Properties: name          
+            
+        .GetDatabaseFileInfo()
+            Retrieves information on the data and log files for 
+                all databases. Examples of the files are
+                .mdf, .ndf, .ldf file location, growth, 
+            Properties: DatabaseName
+                        file_id
+                        growth
+                        GrowthInMB
+                        is_percent_growth
+                        LogicalName
+                        PhysicalName
+                        state_desc
+                        TotalSizeInMB
+                        type_desc
+
+        .GetDatabaseProperties()
+            Returns list of database properties
+            Properties: DatabaseName                   
+                        DB Compatibility Level         
+                        is_auto_close_on               
+                        is_auto_create_stats_on        
+                        is_auto_shrink_on              
+                        is_auto_update_stats_async_on  
+                        is_auto_update_stats_on        
+                        is_cdc_enabled                 
+                        is_parameterization_forced     
+                        is_read_committed_snapshot_on  
+                        Log Reuse Wait Description     
+                        LogSizeInMB                    
+                        LogUsedInMB                   
+                        PageVerifyOption               
+                        PercentLogUsed                 
+                        RecoveryModel                  
+                        snapshot_isolation_state_desc  
+                        state_desc                     
+                        target_recovery_time_in_seconds
+
+        .GetDatabaseOrphanedUsers()
+            Get information about database user accounts
+            under the connected catalog regarding any
+            oprhaned users. Method uses stored procedure
+            sp_change_users_login with param 'report'
+
+        .GetDatbaseOwners()
+            Retrieves databases and their respective owners
+            Properties: DatabaseName
+                        DatabaseOwner
+
+        .GetDatabaseProperties()
+            Retrieve properties for all databases on the connected SQL instance.
+            Properties: DatabaseName
+                        DBCompatibilityLevel
+                        is_auto_close_on
+                        is_auto_create_stats_on
+                        is_auto_shrink_on
+                        is_auto_update_stats_async_on
+                        is_auto_update_stats_on
+                        is_cdc_enabled
+                        is_parameterization_forced
+                        is_read_committed_snapshot_on
+                        Log Reuse Wait Description
+                        LogSizeInMB
+                        LogUsedInMB
+                        PageVerifyOption
+                        PercentLogUsed
+                        RecoveryModel
+                        snapshot_isolation_state_desc
+                        state_desc
+                        target_recovery_time_in_seconds
+
+        .GetDatabaseSize()
+            Returns the file size information for current connected database.
+            Properties: AvailableSpaceInMB
+                        FileName
+                        FileGroupName
+                        file_id
+                        PhysicalName
+                        TotalSizeMB
+
+        .GetErrorLogConfig()
+            Get the error log configuration to incldue 
+                location of the file
+            Properties: is_enabled
+                        max_files
+                        max_size
+                        path
+
+        .GetHostHardwareInfo()
+            Get Host hardware information for active SQL node
+            Properties: AffinityType
+                        CommittedMemoryMB
+                        CommittedTargetMemoryMB
+                        HyperthreadRatio
+                        LogicalCPUCount
+                        Max Workers Count
+                        PhysicalCPUCount
+                        PhysicalMemoryMB
+                        scheduler_count
+                        SQLServerStartTime
+                        VirtualMachineType
+        .GetServerVersion()
+            Retrieve SQL Server Version and Build information
+            Properties: ServerName
+                        SQLVersion   
+
+        .GetServiceInfo()
+            Retrieves the service accounts running SQL Server
+            Properties: service_account 
+                        servicename 
+                        startup_type_desc 
+                        status_desc
+                        last_startup_time
+                        process_id
+                        filename
+                        is_clustered
+                        cluster_nodename
+
+        .GetSQLCongfigs()
+            Retrieve the current SQL Server configurations 
+            for the instance
+            Properties: description
+                        is_advanced
+                        is_dynamic
+                        maximum
+                        minimum
+                        name
+                        value
+                        value_in_use
+
+        .GetSQLLUNInfo()
+            Retrieve the LUN information where SQL Server 
+                active node is accessing and storing the data
+            Properties: AvailableSizeGB
+                        file_system_type
+                        logical_volume_name
+                        PercentSpaceFree
+                        TotalSizeGB
+                        volume_mount_point
+        
+        .GetTcpInfo()
+            Get the TCP information for the SQL Server 
+                instance active node
+            Properties: ip_address
+                        is_ipv4
+                        listener_id
+                        port
+                        start_time
+                        state_desc
+                        type_desc
+
+        .GetIndexMissing()
+
+        .GetPendingMemoryGrants()
+            Retrieve information regarding Pending Memory Grants
+                on the connected instance
+            Properties: MemoryGrantsPending
+                        ObjectName
+                        ServerName
+
+        .GetInstanceProperties()
+            Returns SQL instance properties.
+            Properties: Collation
+                        Edition
+                        FilestreamConfiguredLevel
+                        FileStreamEffectiveLevel
+                        InstanceName
+                        IsClustered
+                        IsFullTextInstalled
+                        IsHadrEnabled
+                        ISIntegratedSecurityOnly
+                        MAXDOP
+                        NetBios
+                        ProductVersion
+                        ServerName
+                        SqlCharSetName
+                        SQLMemory
+                        SqlSortOrderName
+
+        .GetIOStatsByFile()
+            Query is specific for current connected database.
+                Retrieves I/O data for database files
+            Properties: DatabaseName
+                        file_id
+                        IOStallReadsPct
+                        IOStallWritesPct
+                        io_stall_read_ms
+                        io_stall_write_ms
+                        LogicalName
+                        ReadMB
+                        WrittenMB
+                        NumberReadsPct
+                        NumberWritePct
+                        num_of_reads
+                        num_of_writes
+                        PhysicalName
+                        ReadBytesPct
+                        WritesAndReads
+                        WrittenBytesPct
+
+        .SearchSQLErrorLog()
+
+        .GetWindowsOSInfo()
+            Get host operating system of active SQL Node
+            Properties: WindowsRelease
+                        WindowsServicePackLevel
+                        WindowsSKU
+                        LanguageVersion
+"@
+
+ $AllHelpMessage
+}
+
+Export-ModuleMember -Function Get-SqlServerClientHelp

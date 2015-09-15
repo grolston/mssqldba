@@ -171,14 +171,15 @@ function Get-SQLDatabaseProperties
     PARAM()
 
     $DatabaseProperties = @'
+    --Adapted From - Copyright (C) 2014 Glenn Berry, SQLskills.com
     SELECT db.[name] AS [DatabaseName], 
         db.recovery_model_desc AS [RecoveryModel], 
         db.state_desc, 
-        db.log_reuse_wait_desc AS [Log Reuse Wait Description], 
+        db.log_reuse_wait_desc AS [LogReuseWaitDescription], 
         CONVERT(DECIMAL(18,2), ls.cntr_value/1024.0) AS [LogSizeInMB], 
-        CONVERT(DECIMAL(18,2), lu.cntr_value/1024.0) AS [LogUsedInMB)],
+        CONVERT(DECIMAL(18,2), lu.cntr_value/1024.0) AS [LogUsedInMB],
         CAST(CAST(lu.cntr_value AS FLOAT) / CAST(ls.cntr_value AS FLOAT)AS DECIMAL(18,2)) * 100 AS [PercentLogUsed], 
-        db.[compatibility_level] AS [DB Compatibility Level], 
+        db.[compatibility_level] AS [DatabaseCompatibilityLevel], 
         db.page_verify_option_desc AS [PageVerifyOption], 
         db.is_auto_create_stats_on, 
         db.is_auto_update_stats_on,
@@ -212,59 +213,17 @@ function Get-SQLListDatabaseOrphanedUsers
     return $ListDatabaseOrphanedUsers
 }
 
-function Get-SQLLinkDatabaseOrphanedUser
-{
-    PARAM(
-    # Database Account Name
-    [Parameter(
-        Mandatory=$true,
-        ValueFromPipeline=$false,
-        Position=0
-    )]
-    [string]$DatbaseUser,
-
-    # SQL Account Login
-    [Parameter(
-        Mandatory=$true,
-        ValueFromPipeline=$false,
-        Position=1
-    )]
-    [string]$Login
-    )
-
-    $LinkDatabaseOrphanedUser = @"
-    sp_change_users_login @Action='update_one', @UserNamePattern='$DatbaseUser', 
-    @LoginName='$Login';
-"@
-    return $LinkDatabaseOrphanedUser
-}
-
-function Get-SQLRelinkDatabaseOrphanedUser
-{
-    PARAM(
-        # Database Account Name
-        [Parameter(
-            Mandatory=$true,
-            ValueFromPipeline=$false,
-            Position=0
-        )]
-        [string]$DatbaseUser
-    )
-    $RelinkDatabaseOrphanedUser =@"
-    EXEC sp_change_users_login 'Auto_Fix', '$DatabaseUser'
-"@
-    return $RelinkDatabaseOrphanedUser
-}
-
 function Get-SQLDatabaseSize
 {
     PARAM()
+    # Query returns only the Database Size information for current database connection
     $DatabaseSizes = @'
-        SELECT f.name AS [File Name] , 
-                f.physical_name AS [Physical Name], 
-                CAST((f.size/128.0) AS DECIMAL(15,2)) AS [Total Size in MB],
-                CAST(f.size/128.0 - CAST(FILEPROPERTY(f.name, 'SpaceUsed') AS int)/128.0 AS DECIMAL(15,2)) 
-                    AS [Available Space In MB], [file_id], fg.name AS [Filegroup Name]
+        SELECT f.name AS [FileName] , 
+                f.physical_name AS [PhysicalName], 
+                CAST((f.size/128.0) AS DECIMAL(15,2)) AS [TotalSizeMB],
+                CAST(f.size/128.0 - CAST(FILEPROPERTY(f.name, 'SpaceUsed') 
+                    AS int)/128.0 AS DECIMAL(15,2)) AS [AvailableSpaceInMB], 
+               [file_id], fg.name AS [FileGroupName]
         FROM sys.database_files AS f WITH (NOLOCK) 
             LEFT OUTER JOIN sys.data_spaces AS fg WITH (NOLOCK) 
             ON f.data_space_id = fg.data_space_id OPTION (RECOMPILE);
@@ -275,31 +234,34 @@ function Get-SQLDatabaseSize
 function Get-SQLIOStatsByFile
 {
     PARAM()
+    # Query is specific for current connected database
+
     $IOStatsByFile = @'
-        SELECT DB_NAME(DB_ID()) AS [Database Name], 
-                df.name AS [Logical Name], 
+        --Adapted From - Copyright (C) 2014 Glenn Berry, SQLskills.com
+        SELECT DB_NAME(DB_ID()) AS [DatabaseName], 
+                df.name AS [LogicalName], 
                 vfs.[file_id], 
-                df.physical_name AS [Physical Name], 
-                vfs.num_of_reads, vfs.num_of_writes, 
+                df.physical_name AS [PhysicalName], 
+                vfs.num_of_reads, 
+                vfs.num_of_writes, 
                 vfs.io_stall_read_ms, 
                 vfs.io_stall_write_ms,
-                CAST(100. * vfs.io_stall_read_ms/(vfs.io_stall_read_ms + vfs.io_stall_write_ms) AS DECIMAL(10,1)) AS [IO Stall Reads Pct],
-                CAST(100. * vfs.io_stall_write_ms/(vfs.io_stall_write_ms + vfs.io_stall_read_ms) AS DECIMAL(10,1)) AS [IO Stall Writes Pct],
-                (vfs.num_of_reads + vfs.num_of_writes) AS [Writes + Reads], 
-                CAST(vfs.num_of_bytes_read/1048576.0 AS DECIMAL(10, 2)) AS [MB Read], 
-                CAST(vfs.num_of_bytes_written/1048576.0 AS DECIMAL(10, 2)) AS [MB Written],
-                CAST(100. * vfs.num_of_reads/(vfs.num_of_reads + vfs.num_of_writes) AS DECIMAL(10,1)) AS [# Reads Pct],
-                CAST(100. * vfs.num_of_writes/(vfs.num_of_reads + vfs.num_of_writes) AS DECIMAL(10,1)) AS [# Write Pct],
-                CAST(100. * vfs.num_of_bytes_read/(vfs.num_of_bytes_read + vfs.num_of_bytes_written) AS DECIMAL(10,1)) AS [Read Bytes Pct],
-                CAST(100. * vfs.num_of_bytes_written/(vfs.num_of_bytes_read + vfs.num_of_bytes_written) AS DECIMAL(10,1)) AS [Written Bytes Pct]
+                CAST(100. * vfs.io_stall_read_ms/(vfs.io_stall_read_ms + vfs.io_stall_write_ms) AS DECIMAL(10,1)) AS [IOStallReadsPct],
+                CAST(100. * vfs.io_stall_write_ms/(vfs.io_stall_write_ms + vfs.io_stall_read_ms) AS DECIMAL(10,1)) AS [IOStallWritesPct],
+                (vfs.num_of_reads + vfs.num_of_writes) AS [WritesAndReads], 
+                CAST(vfs.num_of_bytes_read/1048576.0 AS DECIMAL(10, 2)) AS [ReadMB], 
+                CAST(vfs.num_of_bytes_written/1048576.0 AS DECIMAL(10, 2)) AS [WrittenMB],
+                CAST(100. * vfs.num_of_reads/(vfs.num_of_reads + vfs.num_of_writes) AS DECIMAL(10,1)) AS [NumberReadsPct],
+                CAST(100. * vfs.num_of_writes/(vfs.num_of_reads + vfs.num_of_writes) AS DECIMAL(10,1)) AS [NumberWritePct],
+                CAST(100. * vfs.num_of_bytes_read/(vfs.num_of_bytes_read + vfs.num_of_bytes_written) AS DECIMAL(10,1)) AS [ReadBytesPct],
+                CAST(100. * vfs.num_of_bytes_written/(vfs.num_of_bytes_read + vfs.num_of_bytes_written) AS DECIMAL(10,1)) AS [WrittenBytesPct]
         FROM sys.dm_io_virtual_file_stats(DB_ID(), NULL) AS vfs
-            INNER JOIN sys.database_files AS df WITH (NOLOCK)
+            INNER JOIN sys.database_files AS df WITH(NOLOCK)
             ON vfs.[file_id]= df.[file_id]
-        OPTION (RECOMPILE);
+        OPTION(RECOMPILE);
 '@
     return $IOStatsByFile
 }
-
 
 
 #endregion
@@ -321,7 +283,7 @@ function Get-SQLListAllDatabaseOwners
 {
     PARAM()
     $ListAllDatabaseOwners = @'
-        SELECT name, 
+        SELECT name as DatabaseName, 
             SUSER_sNAME(owner_sid) as DatabaseOwner 
         FROM sys.databases WITH(NOLOCK) 
         ORDER BY name ASC
@@ -334,7 +296,7 @@ function Get-SQLListUserDatabaseNames
 {
     PARAM()
     $ListAllUserDatabases = @"
-    SELECT name 
+    SELECT name as DatabaseName
     FROM sys.databases WITH(NOLOCK)
     WHERE name NOT IN ('master', 'model', 'tempdb', 'msdb', 'Resource')
     OPTION(RECOMPILE);
@@ -371,7 +333,7 @@ function Get-SQLGetServerVersion
 {
     PARAM()
 $ListServerVersion =  @'
-SELECT @@SERVERNAME AS [ServerName], @@VERSION AS [SQLServerOSVersionInfo];
+SELECT @@SERVERNAME AS [ServerName], @@VERSION AS [SQLVersion];
 '@
 return $ListServerVersion
 }
@@ -381,10 +343,10 @@ function Get-SQLGetWindowsOSInfo
     PARAM()
     $ListWindowsOSInfo = @'
     --Adapted From Glenn Berry's Diagnostic Information Queries, Copyright (C) 2014 SQLskills.com
-    SELECT windows_release AS WindowsRelease, 
-        windows_service_pack_level AS WindowsServicePackLevel, 
-       windows_sku AS WindowsSKU, 
-       os_language_version AS LanguageVersion
+    SELECT  windows_release AS WindowsRelease, 
+            windows_service_pack_level AS WindowsServicePackLevel, 
+            windows_sku AS WindowsSKU, 
+            os_language_version AS LanguageVersion
     FROM sys.dm_os_windows_info WITH(NOLOCK) 
     OPTION(RECOMPILE);
 '@
@@ -420,24 +382,15 @@ $ListSQLHostHardwareInfo = @'
         scheduler_count, hyperthread_ratio AS [HyperthreadRatio],
         cpu_count/hyperthread_ratio AS [PhysicalCPUCount], 
         physical_memory_kb/1024 AS [PhysicalMemoryMB], 
-        committed_kb/1024 AS [Committed Memory (MB)],
-        committed_target_kb/1024 AS [Committed Target Memory (MB)],
-        max_workers_count AS [Max Workers Count], 
-        affinity_type_desc AS [Affinity Type], 
-        sqlserver_start_time AS [SQL Server Start Time], 
-        virtual_machine_type_desc AS [Virtual Machine Type]  
+        committed_kb/1024 AS [Committed MemoryMB],
+        committed_target_kb/1024 AS [CommittedTargetMemoryMB],
+        max_workers_count AS [MaxWorkersCount], 
+        affinity_type_desc AS [AffinityType], 
+        sqlserver_start_time AS [SQLServerStartTime], 
+        virtual_machine_type_desc AS [VirtualMachineType]  
     FROM sys.dm_os_sys_info WITH (NOLOCK) OPTION (RECOMPILE);
 '@
     return $ListSQLHostHardwareInfo
-}
-
-function Get-SQLGetSystemManufacturerAndModel
-{
-    PARAM()
-    $ListSystemManufacturerAndModel = @'
-        EXEC xp_readerrorlog 0, 1, "Manufacturer"; 
-'@
-    return $ListSystemManufacturerAndModel
 }
 
 function Get-SQLListSQLCongfigs
@@ -465,10 +418,14 @@ function Get-SQLDatabaseFileInfo
     $ListAllDatabaseFileInfo = @'
         --Adapted From Glenn Berry's Diagnostic Information Queries, Copyright (C) 2014 SQLskills.com
         SELECT DB_NAME([database_id]) AS [DatabaseName], 
-            [file_id], name, physical_name, type_desc, state_desc,
+            [file_id], 
+            name AS LogicalName, 
+            physical_name As PhysicalName, 
+            type_desc, 
+            state_desc,
 	        is_percent_growth, growth,
-	        CONVERT(bigint, growth/128.0) AS [Growth in MB], 
-            CONVERT(bigint, size/128.0) AS [Total Size in MB]
+	        CONVERT(bigint, growth/128.0) AS [GrowthInMB], 
+            CONVERT(bigint, size/128.0) AS [TotalSizeMB]
         FROM sys.master_files WITH (NOLOCK)
         WHERE [database_id] > 4 
         AND [database_id] <> 32767
@@ -484,9 +441,9 @@ function Get-SQLListSqlLUNSpaceInfo
     $ListSqlLUNsSpaceInfo = @'
         --Adapted From Glenn Berry's Diagnostic Information Queries, Copyright (C) 2014 SQLskills.com
         SELECT DISTINCT vs.volume_mount_point, vs.file_system_type, 
-        vs.logical_volume_name, CONVERT(DECIMAL(18,2),vs.total_bytes/1073741824.0) AS [Total Size (GB)],
-        CONVERT(DECIMAL(18,2),vs.available_bytes/1073741824.0) AS [Available Size (GB)],  
-        CAST(CAST(vs.available_bytes AS FLOAT)/ CAST(vs.total_bytes AS FLOAT) AS DECIMAL(18,2)) * 100 AS [Space Free %] 
+        vs.logical_volume_name, CONVERT(DECIMAL(18,2),vs.total_bytes/1073741824.0) AS [TotalSizeGB],
+        CONVERT(DECIMAL(18,2),vs.available_bytes/1073741824.0) AS [AvailableSizeGB],  
+        CAST(CAST(vs.available_bytes AS FLOAT)/ CAST(vs.total_bytes AS FLOAT) AS DECIMAL(18,2)) * 100 AS [PercentSpaceFree] 
         FROM sys.master_files AS f WITH (NOLOCK)
         CROSS APPLY sys.dm_os_volume_stats(f.database_id, f.[file_id]) AS vs OPTION (RECOMPILE);
 '@
@@ -783,3 +740,58 @@ $ListSqlTcpInfo = @'
 #region TSQL Counters
 
 #endregion TSQL Counters
+
+#region NOT IMPLEMENTED YET
+function Get-SQLLinkDatabaseOrphanedUser
+{
+    PARAM(
+    # Database Account Name
+    [Parameter(
+        Mandatory=$true,
+        ValueFromPipeline=$false,
+        Position=0
+    )]
+    [string]$DatbaseUser,
+
+    # SQL Account Login
+    [Parameter(
+        Mandatory=$true,
+        ValueFromPipeline=$false,
+        Position=1
+    )]
+    [string]$Login
+    )
+
+    $LinkDatabaseOrphanedUser = @"
+    sp_change_users_login @Action='update_one', @UserNamePattern='$DatbaseUser', 
+    @LoginName='$Login';
+"@
+    return $LinkDatabaseOrphanedUser
+}
+
+function Get-SQLRelinkDatabaseOrphanedUserAutoFix
+{
+    PARAM(
+        # Database Account Name
+        [Parameter(
+            Mandatory=$true,
+            ValueFromPipeline=$false,
+            Position=0
+        )]
+        [string]$DatbaseUser
+    )
+    $RelinkDatabaseOrphanedUser =@"
+    EXEC sp_change_users_login 'Auto_Fix', '$DatabaseUser'
+"@
+    return $RelinkDatabaseOrphanedUser
+}
+
+function Get-SQLGetSystemManufacturerAndModel
+{
+    PARAM()
+    $ListSystemManufacturerAndModel = @'
+        EXEC xp_readerrorlog 0, 1, "Manufacturer"; 
+'@
+    return $ListSystemManufacturerAndModel
+}
+#endregion NOT IMPLEMENTED YET

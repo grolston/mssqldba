@@ -6,31 +6,31 @@ Currently this only supports read queries; however additional capabilities are b
 Example:
 
 create a credential object to store either windows credential or SQL Account
-```powershell 
+```Powershell 
 $Creds = Get-Credential
 ```
 note: if you are using Windows account which you are running powershell under, you will not need to supply a credential.
 
 instantiate the object supplying your SQL connection information
-```powershell
+```Powershell
 $Local = New-SqlServerClient -ServerInstance myComp -Database myDatabase  -Credential $Creds -Security SQLAccount -Port 1433
 ```
 
 list all database
-```powershell
+```Powershell
 $Local.ListDatabases()
 ```
 
 find orphaned users
-```powershell
+```Powershell
 $Local.GetDatabaseOrphanedUsers()
 ```
 view current database connected to
-```powershell
+```Powershell
 $Local.Database()
 ```
 change database connection
-```powershell
+```Powershell
 $Local.Database('MyNewDatabase')
-```powershell
+```Powershell
  

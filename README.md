@@ -13,7 +13,9 @@ note: if you are using Windows account which you are running powershell under, y
 
 instantiate the object supplying your SQL connection information
 ```Powershell
+
 $Local = New-SqlServerClient -ServerInstance myComp -Database myDatabase  -Credential $Creds -Security SQLAccount -Port 1433
+
 ```
 
 list all database

@@ -5,13 +5,13 @@ Currently this only supports read queries; however additional capabilities are b
 
 Example:
 
-create a credential object to store either windows credential or SQL Account
+Create a credential object to store either windows credential or SQL Account
 ```Powershell 
 $Creds = Get-Credential
 ```
 note: if you are using Windows account which you are running powershell under, you will not need to supply a credential.
 
-instantiate the object supplying your SQL connection information
+Instantiate the object supplying your SQL connection information
 ```Powershell
 
 $Local = New-SqlServerClient -ServerInstance myComp -Database myDatabase  -Credential $Creds -Security SQLAccount -Port 1433
@@ -31,7 +31,7 @@ View current database connected to
 ```Powershell
 $Local.Database()
 ```
-change database connection
+Change database connection
 ```Powershell
 $Local.Database('MyNewDatabase')
 ```
